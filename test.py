@@ -33,11 +33,7 @@ def loop():
                 #只打断内层循环
                 break
 
+
+
 if __name__ == '__main__':
-    for i in range(10):
-        n = 0
-        while True:
-            n+=1
-            if n > 10:
-                print('break',i)
-                break
+    np.finfo(np.float32).eps.item()

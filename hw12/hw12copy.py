@@ -10,7 +10,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
 #from tqdm.notebook import tqdm
-
+from collections import namedtuple
 seed = 543 # Do not change this
 def fix(env, seed):
   env.seed(seed)
@@ -29,6 +29,7 @@ def fix(env, seed):
 import gym
 import random
 
+SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 class PolicyGradientNetwork(nn.Module):
 
@@ -36,12 +37,21 @@ class PolicyGradientNetwork(nn.Module):
         super().__init__()
         self.fc1 = nn.Linear(8, 16)
         self.fc2 = nn.Linear(16, 16)
-        self.fc3 = nn.Linear(16, 4)
+
+        # actor's layer
+        self.action_head = nn.Linear(16, 4)
+
+        # critic's layer
+        self.value_head = nn.Linear(16, 1)
 
     def forward(self, state):
-        hid = torch.tanh(self.fc1(state))
-        hid = torch.tanh(self.fc2(hid))
-        return F.softmax(self.fc3(hid), dim=-1)
+        hid = torch.relu(self.fc1(state))
+        hid = torch.relu(self.fc2(hid))
+
+        action_prob = F.softmax(self.action_head(hid), dim=-1)
+        state_values = self.value_head(hid)
+
+        return action_prob,state_values
 
 
 from torch.optim.lr_scheduler import StepLR
@@ -58,22 +68,46 @@ class PolicyGradientAgent():
         self.network = network
         self.optimizer = optim.SGD(self.network.parameters(), lr=0.001)
 
+        #保存 actions
+        self.saved_actions = []
+
     def forward(self, state):
         return self.network(state)
 
     def learn(self, log_probs, rewards):
-        loss = (-log_probs * rewards).sum()  # You don't need to revise this to pass simple baseline (but you can)
+        policy_losses = []  # list to save actor (policy) loss
+        value_losses = []  # list to save critic (value) loss
+        for (log_prob, value), R in zip(self.saved_actions, rewards):
+            advantage = R - value.item()
 
+            # calculate actor (policy) loss
+            policy_losses.append(-log_prob * advantage)
+
+            # calculate critic (value) loss using L1 smooth loss
+            value_losses.append(F.smooth_l1_loss(value, torch.tensor([R])))
+
+        # reset gradients
         self.optimizer.zero_grad()
+
+        #loss = (-log_probs * rewards).sum()  # You don't need to revise this to pass simple baseline (but you can)
+        loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
+
         loss.backward()
         self.optimizer.step()
 
+        # reset rewards and action buffer
+        del self.saved_actions[:]
+
     def sample(self, state):
-        action_prob = self.network(torch.FloatTensor(state))
+
+        action_prob,state_value = self.network(torch.FloatTensor(state))
+
         action_dist = Categorical(action_prob)
         action = action_dist.sample()
+
         log_prob = action_dist.log_prob(action)
-        return action.item(), log_prob
+
+        return action.item(), log_prob,state_value
 
 network = PolicyGradientNetwork()
 agent = PolicyGradientAgent(network)
@@ -98,7 +132,7 @@ def calcReward(rewards):
 def train():
     agent.network.train()  # Switch network into training mode
     EPISODE_PER_BATCH = 5  # update the  agent every 5 episode
-    NUM_BATCH = 400  # totally update the agent for 400 time
+    NUM_BATCH = 1000  # totally update the agent for 400 time
 
     avg_total_rewards, avg_final_rewards = [], []
 
@@ -116,7 +150,10 @@ def train():
             seq_rewards = []
 
             while True:
-                action, log_prob = agent.sample(state)  # at, log(at|st)
+                action, log_prob,state_value = agent.sample(state)  # at, log(at|st)
+                #save action
+                agent.saved_actions.append(SavedAction(log_prob, state_value))
+
                 next_state, reward, done, _ = env.step(action)
 
                 log_probs.append(log_prob)  # [log(a1|s1), log(a2|s2), ...., log(at|st)]
@@ -144,22 +181,25 @@ def train():
         avg_final_reward = sum(final_rewards) / len(final_rewards)
         avg_total_rewards.append(avg_total_reward)
         avg_final_rewards.append(avg_final_reward)
+        #prg_bar.set_description(f"Total: {avg_total_reward: 4.1f}, Final: {avg_final_reward: 4.1f}")
 
         # update agent
+
         #accumulative decaying reward
         calcReward(rewards)
         # rewards = np.concatenate(rewards, axis=0)
-        rewards = (rewards - np.mean(rewards)) / (np.std(rewards) + 1e-9)  # normalize the reward
-
+        #rewards = (rewards - np.mean(rewards)) / (np.std(rewards) + 1e-9)  # normalize the reward
+        rewards = (rewards - np.mean(rewards)) / (np.std(rewards) + np.finfo(np.float32).eps.item())  # normalize the reward
         agent.learn(torch.stack(log_probs), torch.from_numpy(rewards))
         #print("logs prob looks like ", torch.stack(log_probs).size())
         #print("torch.from_numpy(rewards) looks like ", torch.from_numpy(rewards).size())
-        plt.plot(avg_total_rewards)
-        plt.title("Total Rewards")
-        plt.show()
+        if batch%10 ==0:
+            plt.plot(avg_total_rewards)
+            plt.title("Total Rewards")
+            plt.show()
 
     os.makedirs('models', exist_ok=True)  # The trained model will be saved to ./models/
-    torch.save(agent.network.state_dict(), 'models/agentNet1.pth')
+    torch.save(agent.network.state_dict(), 'models/agentNet_ac.pth')
 
 def test():
     fix(env, seed)
@@ -177,7 +217,7 @@ def test():
 
         done = False
         while not done:
-            action, _ = agent.sample(state)
+            action, log_prob,state_value = agent.sample(state)
             actions.append(action)
             state, reward, done, _ = env.step(action)
 
@@ -199,9 +239,9 @@ if __name__ == '__main__':
 
     #print(env.observation_space)
     #print(env.action_space)
-    ckpt = torch.load('models/agentNet.pth', map_location='cpu')  # Load your best model
-    agent.network.load_state_dict(ckpt)
-   #train()
+    #ckpt = torch.load('models/agentNet_ac.pth', map_location='cpu')  # Load your best model
+    #agent.network.load_state_dict(ckpt)
+    train()
     test()
 
 

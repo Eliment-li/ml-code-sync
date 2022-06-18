@@ -154,8 +154,8 @@ def main():
             # take the action
             state, reward, done, _ = env.step(action)
 
-            if args.render:
-                env.render()
+            #if args.render:
+            #env.render()
 
             model.rewards.append(reward)
             ep_reward += reward
