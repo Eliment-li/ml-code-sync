@@ -77,7 +77,7 @@ def plot_durations(total_rewards):
         means = torch.cat((torch.zeros(99), means))
         plt.plot(means.numpy())
 
-    plt.pause(0.001)  # pause a bit so that plots are updated
+    plt.pause(0.0001)  # pause a bit so that plots are updated
 
 def compute_returns(next_value, rewards, masks, gamma=0.99):
     R = next_value
@@ -121,7 +121,7 @@ def trainIters(actor, critic, n_iters):
             if done:
                 #print('Iteration: {}, Score: {}'.format(iter, i))
                 total_rewards.append(total_reward)
-                if i %100 == 0:
+                if i %200 == 0:
                     plot_durations(total_rewards)
                 break
 
@@ -195,7 +195,7 @@ def test():
     #torch.save(agent.network.state_dict,'models/agentNet.pth')
 if __name__ == '__main__':
     fix(env, seed)
-    #trainIters(actor, critic, n_iters=8000)
-    actor.load_state_dict(torch.load('models/06_19_17_10_actor.pth', map_location='cpu'))
-    critic.load_state_dict(torch.load('models/06_19_17_10_critic.pth', map_location='cpu'))
+    actor.load_state_dict(torch.load('models/06_23_12_22_actor.pth', map_location='cpu'))
+    critic.load_state_dict(torch.load('models/06_23_12_22_critic.pth', map_location='cpu'))
+    #trainIters(actor, critic, n_iters=5000)
     test()
