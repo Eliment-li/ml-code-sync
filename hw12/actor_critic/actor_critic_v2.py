@@ -88,6 +88,10 @@ def compute_returns(next_value, rewards, masks, gamma=0.99):
     return returns
 
 total_rewards = []
+
+#network
+actor = Actor(state_size, action_size).to(device)
+critic = Critic(state_size, action_size).to(device)
 def trainIters(actor, critic, n_iters):
     optimizerA = optim.Adam(actor.parameters())
     optimizerC = optim.Adam(critic.parameters())
@@ -155,8 +159,7 @@ def trainIters(actor, critic, n_iters):
     torch.save(critic.state_dict(), 'models/'+timestr+'_critic.pth')
     # env.close()
 
-actor = Actor(state_size, action_size).to(device)
-critic = Critic(state_size, action_size).to(device)
+
 def test():
     # set the network into evaluation mode
     actor.eval()
