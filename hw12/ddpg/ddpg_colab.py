@@ -25,6 +25,7 @@ def fixed():
     np.random.seed(seed)
     random.seed(seed)
 
+
 class ReplayBuffer:
     """A simple numpy replay buffer."""
 
@@ -101,6 +102,7 @@ class OUNoise:
         )
         self.state = x + dx
         return self.state
+
 
 
 class Actor(nn.Module):
@@ -244,7 +246,7 @@ class DDPGAgent:
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
-        print(self.device)
+        print('using '+str(self.device))
 
         # networks
         self.actor = Actor(obs_dim, action_dim).to(self.device)
@@ -268,6 +270,7 @@ class DDPGAgent:
         # mode: train / test
         self.is_test = False
 
+    #选择 action
     def select_action(self, state: np.ndarray) -> np.ndarray:
         """Select an action from the input state."""
         # if initial random action should be conducted
@@ -293,7 +296,11 @@ class DDPGAgent:
 
         if not self.is_test:
             self.transition += [reward, next_state, done]
+            #+= 操作相当于 append
+            # transition = [state, selected_action,reward, next_state, done]
             self.memory.store(*self.transition)
+            # 用 *操作取出 transition 中的值 ,然后放入 memory中
+
 
         return next_state, reward, done
 
@@ -301,7 +308,9 @@ class DDPGAgent:
         """Update the model by gradient descent."""
         device = self.device  # for shortening the following lines
 
+        #从 replay buffer中随机取出训练数据
         samples = self.memory.sample_batch()
+
         state = torch.FloatTensor(samples["obs"]).to(device)
         next_state = torch.FloatTensor(samples["next_obs"]).to(device)
         action = torch.FloatTensor(samples["acts"].reshape(-1, 1)).to(device)
@@ -309,6 +318,7 @@ class DDPGAgent:
         done = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
 
         masks = 1 - done
+
         next_action = self.actor_target(next_state)
         next_value = self.critic_target(next_state, next_action)
         curr_return = reward + self.gamma * next_value * masks
@@ -321,6 +331,7 @@ class DDPGAgent:
         critic_loss.backward()
         self.critic_optimizer.step()
 
+        print(self.critic(state, self.actor(state)))
         # train actor
         actor_loss = -self.critic(state, self.actor(state)).mean()
 
@@ -363,6 +374,7 @@ class DDPGAgent:
             ):
                 actor_loss, critic_loss = self.update_model()
 
+                #记录数据,用于绘图
                 actor_losses.append(actor_loss.cpu())
                 critic_losses.append(critic_loss.cpu())
 
@@ -374,6 +386,7 @@ class DDPGAgent:
                     actor_losses,
                     critic_losses,
                 )
+        #保存模型
         self.saveModel()
         self.env.close()
 
@@ -385,6 +398,12 @@ class DDPGAgent:
         torch.save(self.critic.state_dict(), 'models/' + timestr + 'ddpg_ciritc.pth')
         #torch.save(self.critic_target.state_dict(), 'models/' + timestr + 'ddpg_actor.pth')
 
+    def loadModel(self):
+
+        agent.actor.load_state_dict(torch.load('models/agentNet.pth', map_location='cpu'))
+        agent.actor_target.load_state_dict(torch.load('models/agentNet.pth', map_location='cpu'))
+        agent.critic.load_state_dict(torch.load('models/agentNet.pth', map_location='cpu'))
+        agent.critic_target.load_state_dict(torch.load('models/agentNet.pth', map_location='cpu'))
 
 
     def test(self):
@@ -492,7 +511,7 @@ seed_torch(seed)
 #env.reset(seed)
 
 # parameters
-num_frames = 50000
+num_frames = 100000
 memory_size = 100000
 batch_size = 128
 ou_noise_theta = 1.0
@@ -509,6 +528,7 @@ if __name__ == '__main__':
         ou_noise_sigma,
         initial_random_steps=initial_random_steps
     )
+
 
 
     agent.train(num_frames)
