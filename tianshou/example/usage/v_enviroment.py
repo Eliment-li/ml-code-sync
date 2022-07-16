@@ -1,5 +1,6 @@
 '''
-Tianshou provides vectorized environment wrapper for a Gym environment. This wrapper allows you to make use of multiple cpu cores in your server to accelerate the data sampling.
+Tianshou provides vectorized environment wrapper for a Gym environment.
+This wrapper allows you to make use of multiple cpu cores in your server to accelerate the data sampling.
 '''
 from tianshou.env import SubprocVectorEnv
 import numpy as np
@@ -8,7 +9,7 @@ import time
 
 def init():
 
-    num_cpus = [1, 2, 5]
+    num_cpus = [1, 2, 5,8]
     for num_cpu in num_cpus:
         env = SubprocVectorEnv([lambda: gym.make('CartPole-v0') for _ in range(num_cpu)])
         env.reset()
