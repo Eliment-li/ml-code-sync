@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy
 
-from IPython import display
 
 import numpy as np
 import torch
@@ -32,8 +32,33 @@ def loop():
                 print('break',i)
                 #只打断内层循环
                 break
+observations = ['alertness', 'hypertension', 'intoxication',
+                    'time_since_slept', 'time_elapsed', 'work_done']
 
+def make_heartpole_obs_space():
+    lower_obs_bound = {
+        'alertness': - np.inf,
+        'hypertension': 0,
+        'intoxication': 0,
+        'time_since_slept': 0,
+        'time_elapsed': 0,
+        'work_done': - np.inf
+    }
+    higher_obs_bound = {
+        'alertness': np.inf,
+        'hypertension': np.inf,
+        'intoxication': np.inf,
+        'time_since_slept': np.inf,
+        'time_elapsed': np.inf,
+        'work_done': np.inf
+    }
+
+    low = np.array([lower_obs_bound[o] for o in observations])
+    high = np.array([higher_obs_bound[o] for o in observations])
+    shape = (len(observations),)
+    return gym.spaces.Box(low,high,shape)
 
 
 if __name__ == '__main__':
-    np.finfo(np.float32).eps.item()
+    observation = numpy.array([1])
+    print(observation.shape)
