@@ -186,7 +186,8 @@ class ActionNormalizer(gym.ActionWrapper):
 
         return action
 # environment
-env_id = "Pendulum-v1"
+env_id = "MountainCarContinuous-v0"
+#env_id = "Pendulum-v1"
 env = gym.make(env_id)
 env = ActionNormalizer(env)
 
@@ -331,7 +332,7 @@ class DDPGAgent:
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        print(self.critic(state, self.actor(state)))
+        #print(self.critic(state, self.actor(state)))
         # train actor
         actor_loss = -self.critic(state, self.actor(state)).mean()
 

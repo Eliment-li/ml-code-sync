@@ -65,6 +65,9 @@ class CustomEnv(gym.Env):
 
     return np.array([state[o] for o in obs])  # reward, done, info can't be included
 
+
+
+
   def render(self, mode='human'):
     pass
   def close (self):
